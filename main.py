@@ -7,6 +7,16 @@ from enum import Enum
 # - implement turns
 # - interface with AI
 
+class TroopType(Enum):
+    FLEET = 'f'
+    ARMY = 'a'
+
+class Troop:
+    def __init__(self, region, type, coast=None):
+        self.location = {'region': region, 'coast': coast}
+        region.move_troop(self, coast)
+        self.type = type
+
 class RegionType(Enum):
     LAND = 'l'
     SEA = 's'
@@ -17,24 +27,32 @@ class EdgeType(Enum):
     COAST = 3
 
 class Region:
-    def __init__(self, name, region_type, supply_centre):
+    def __init__(self, name, region_type, supply_centre, coasts=None):
         self.name = name
         self.type = region_type
         self.supply_centre = supply_centre
+        self.coasts = coasts
         self.owner = None
+        self.occupied = {'troop': None, 'coast': None}
         self.neighbours = []
 
-    # coast means that this edge is only accessible from a particular coast of self
-    def add_neighbour(self, region, edge_type=None, coast=None):
+    # self_coast means that edge is accessible if troop is in this particular coast
+    # dest_coast means that edge leads to this particular coast of dest
+    def add_neighbour(self, dest, edge_type=None, self_coast=None, dest_coast=None):
         if edge_type is None:
-            if region.type is RegionType.SEA:
+            if dest.type is RegionType.SEA:
                 edge_type = EdgeType.SEA
-            if region.type is RegionType.LAND and self.type is RegionType.LAND:
+            if dest.type is RegionType.LAND and self.type is RegionType.LAND:
                 edge_type = EdgeType.LAND
-        self.neighbours.append({"type": edge_type, "region": region, "coast": coast})
+        self.neighbours.append({'type': edge_type, 'region': dest, 'self_coast': self_coast, 'dest_coast': dest_coast})
 
     def assign_owner(self, country):
         self.owner = country
+
+    def move_troop(self, troop, coast=None):
+        self.occupied['troop'] = troop
+        self.occupied['coast'] = coast
+
   
 ## Create logic for turns
 class turnLogic:
@@ -58,25 +76,36 @@ class HOLD:
     def __init__(self, origin, destination):
         self.origin = origin
 
+
+def add_adjacencies(region, adjacencies, region_coast=None):
+    for string in adjacencies:
+        # parse string
+        parts = string.split('_')
+        id_parts = parts[0].split('-')
+        # get dest
+        dest = regions[region[id_parts[0]]]
+        # if dest is a particular coast
+        dest_coast = None
+        if len(id_parts) > 1:
+            dest_coast = id_parts[1]
+        # if it is coastal edge
+        if len(parts) > 1: # NOTE: > 1 implies there is a second part to string which must be "c", which denotes a coastal edge
+            region.add_neighbour(dest, edge_type=EdgeType.COAST, self_coast=region_coast, dest_coast=dest_coast)
+        else:
+            region.add_neighbour(region[parts[0]], self_coast=region_coast, dest_coast=dest_coast)
+
+
 # Load Map
 regions = {}
 with open('data.json', 'r') as f:
   data = json.load(f)
   # initialize regions
-  for object in data:
-      regions[object['id']] = Region(object['name'], object['type'], 'supply_centre' in object and object['supply_centre'])
+  for json_object in data:
+    regions[json_object['id']] = Region(json_object['name'], json_object['type'], 'supply_centre' in json_object and json_object['supply_centre'])
   # add adjacencies
-  for object in data:
-      region = regions[object['id']]
-      for string in object['adjacencies']:
-          parts = string.split('_')
-          # if edge is only accessible from particular coast
-          id_parts = parts[0].split('-')
-          coast = None
-          if len(id_parts) > 1:
-              coast = id_parts[1]
-          # if it is coastal edge
-          if len(parts) > 1:
-              region.add_neighbour(region[parts[0]], edge_type=EdgeType.COAST, coast=coast)
-          else:
-              region.add_neighbour(region[parts[0]], coast=coast)
+  for json_object in data:
+    region = regions[json_object['id']]
+    # if region has many coasts
+    if 'coasts' in json_object:
+        for i in range(len(region['coasts'])):
+            add_adjacencies(region, json_object['adjacencies'][i], json_object['coasts'][i])
