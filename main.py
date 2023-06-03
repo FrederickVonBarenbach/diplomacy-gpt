@@ -70,6 +70,13 @@ with open('data.json', 'r') as f:
       region = regions[object['id']]
       for string in object['adjacencies']:
           parts = string.split('_')
+          # if edge is only accessible from particular coast
+          id_parts = parts[0].split('-')
+          coast = None
+          if len(id_parts) > 1:
+              coast = id_parts[1]
           # if it is coastal edge
           if len(parts) > 1:
-              region.add_neighbour(region[parts[0]], )
+              region.add_neighbour(region[parts[0]], edge_type=EdgeType.COAST, coast=coast)
+          else:
+              region.add_neighbour(region[parts[0]], coast=coast)
