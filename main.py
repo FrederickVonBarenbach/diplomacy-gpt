@@ -101,7 +101,9 @@ with open('data.json', 'r') as f:
   data = json.load(f)
   # initialize regions
   for json_object in data:
-    regions[json_object['id']] = Region(json_object['name'], json_object['type'], 'supply_centre' in json_object and json_object['supply_centre'])
+    regions[json_object['id']] = Region(json_object['name'], json_object['type'], 
+                                        'supply_centre' in json_object and json_object['supply_centre'],
+                                        None if 'coasts' not in json_object else json_object['coasts'])
   # add adjacencies
   for json_object in data:
     region = regions[json_object['id']]
